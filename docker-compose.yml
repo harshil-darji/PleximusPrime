@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN  # Allows the container to modify network interfaces
+      - SYS_MODULE # Allows the container to create TUN devices
+    devices:
+      - /dev/net/tun # Provide access to the TUN device
+    ports:
+      - 6881:6881/tcp # Port commonly used for P2P
+      - 6881:6881/udp # Port commonly used for P2P
+      - "${WEBUI_PORT}:${WEBUI_PORT}"  # Using the env variable for port mapping
+    dns:
+      - 1.1.1.1  # Cloudflare DNS
+      - 8.8.8.8  # Google DNS
+    environment:
+      - VPNSP=Mullvad
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      - SERVER_CITIES=${SERVER_CITIES}
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ./gluetun/config:/gluetun
+    restart: unless-stopped
+
+  qbittorrent:
+    image: linuxserver/qbittorrent
+    container_name: qbittorrent
+    depends_on:
+      - gluetun
+    network_mode: service:gluetun # For routing traffic via gluetun VPN
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=${WEBUI_PORT}
+    volumes:
+      - ./qbittorrent/config:/config
+      - ./qbittorrent/downloads:/downloads
+    restart: unless-stopped
